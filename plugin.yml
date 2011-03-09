@@ -1,0 +1,7 @@
+name: Region Market
+version: 0.1
+main: us.Crash.RegionMarket.RegionMarket
+commands:
+  rm:
+    description:
+    usage:
