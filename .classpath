@@ -5,7 +5,8 @@
 	<classpathentry kind="lib" path="C:/Documents and Settings/Natt/Desktop/Minecraft Server/bukkit.jar"/>
 	<classpathentry kind="lib" path="C:/Documents and Settings/Natt/Desktop/Minecraft Server/plugins/WorldEdit.jar"/>
 	<classpathentry kind="lib" path="C:/Documents and Settings/Natt/Desktop/Minecraft Server/plugins/WorldGuard.jar"/>
-	<classpathentry kind="lib" path="C:/Documents and Settings/Natt/Desktop/Minecraft Server/plugins/iConomy.jar"/>
 	<classpathentry kind="lib" path="C:/Documents and Settings/Natt/Desktop/Minecraft Server/plugins/Permissions.jar"/>
+	<classpathentry kind="lib" path="C:/Documents and Settings/Natt/Desktop/Minecraft Server/craftbukkit.jar"/>
+	<classpathentry kind="lib" path="C:/Documents and Settings/Natt/Desktop/Minecraft Server/plugins/iConomy.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

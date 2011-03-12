@@ -14,7 +14,8 @@ public class RegionMarketManager {
 
 	private HashMap<String, ArrayList<RegionSale>> regionList = new HashMap<String, ArrayList<RegionSale>>();
 	private HashMap<String, ArrayList<RegionOffer>> offerList = new HashMap<String, ArrayList<RegionOffer>>();
-
+	private AgentManager AgentMgr = new AgentManager(this);
+	
 	public HashMap<String, ArrayList<RegionSale>> getRegionsForSale(){
 
 		return regionList;
@@ -26,6 +27,8 @@ public class RegionMarketManager {
 		return offerList;
 
 	}
+	
+	public AgentManager getAgentManager(){ return AgentMgr; }
 
 	public RegionOffer findOffer(ProtectedRegion region, String seller, String buyer){
 
@@ -83,7 +86,7 @@ public class RegionMarketManager {
 
 	public ProtectedRegion getRegion(String name){
 
-		return RegionMarket.worldguard.getRegionManager().getRegion(name);
+		return RegionMarket.WorldGuard.getRegionManager().getRegion(name);
 
 	}
 
@@ -272,7 +275,10 @@ public class RegionMarketManager {
 					i.remove();
 
 		}
-
+		
+		RegionAgent a = AgentMgr.getAgent(seller.getName(), region.getId());
+		if(a != null)
+			AgentMgr.removeAgentFromWorld(a);
 
 	}
 
@@ -295,6 +301,10 @@ public class RegionMarketManager {
 					i.remove();
 
 		}
+		
+		RegionAgent a = AgentMgr.getAgent(seller, region.getId());
+		if(a != null)
+			AgentMgr.removeAgentFromWorld(a);
 
 	}
 
@@ -321,15 +331,12 @@ public class RegionMarketManager {
 
 		if(buyAcc.hasEnough(o.getPrice())){
 
-			System.out.println(buyAcc.getBalance() + " " + sellAcc.getBalance());
 			region.getOwners().removePlayer(seller);
 			region.getOwners().addPlayer(buyer);
 			sellAcc.setBalance(sellAcc.getBalance() + o.getPrice());
 			buyAcc.setBalance(buyAcc.getBalance() - o.getPrice());
-			System.out.println(buyAcc.getBalance() + " " + sellAcc.getBalance());
 			sellAcc.save();
 			buyAcc.save();
-			System.out.println(buyAcc.getBalance() + " " + sellAcc.getBalance());
 			Player p = RegionMarket.getPlayer(buyer);
 			if(p != null)
 				p.sendMessage(ChatColor.AQUA + "[RegionMarket] " + ChatColor.YELLOW + seller + " has sold you their region " + region.getId() + "!");
@@ -398,7 +405,7 @@ public class RegionMarketManager {
 		if(region == null)
 			return false;
 
-		return region.isOwner(new BukkitPlayer(RegionMarket.worldguard, p));
+		return region.isOwner(new BukkitPlayer(RegionMarket.WorldGuard, p));
 
 	}
 

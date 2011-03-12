@@ -7,7 +7,10 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+
 import org.bukkit.ChatColor;
+import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 
 public class FileManager {
@@ -44,8 +47,17 @@ public class FileManager {
 			for(int i = 0; i < sales.size(); i++){
 
 				ArrayList<RegionOffer> offers = plugin.getMarketManager().getOffersFor(region, sales.get(i).getSeller());
-
-				writeLine(sales.get(i).getSeller() + "=" + sales.get(i).getPrice() + "," + offers.size());
+				
+				RegionAgent agent = plugin.getMarketManager().getAgentManager().getAgent(sales.get(i).getSeller(), region);
+				
+				writeLine(sales.get(i).getSeller() + "=" + sales.get(i).getPrice() + "," + offers.size() + "," + (agent == null ? -1 : agent.getType()));
+				if(agent != null){
+				
+					if(agent.getType() == 0)
+						writeLine(plugin.getServer().getWorlds().indexOf(agent.getLocation().getWorld()) + "," + agent.getLocation().getX() + "," + agent.getLocation().getY() + "," + agent.getLocation().getZ() + "," + Math.round(agent.getLocation().getYaw()) + "," + Math.round(agent.getLocation().getPitch()) + "," + agent.getPrice());
+					if(agent.getType() == 1)
+						writeLine(plugin.getServer().getWorlds().indexOf(agent.getLocation().getWorld()) + "," + agent.getLocation().getX() + "," + agent.getLocation().getY() + "," + agent.getLocation().getZ() + "," + agent.getPrice());
+				}
 				String offerLine = "";
 				for(int j = 0; j < offers.size(); j++){
 
@@ -150,7 +162,6 @@ public class FileManager {
 							if(nextRegion == null)
 								nextRegion = "";
 
-
 						}
 						if(!in.ready())
 							break;
@@ -182,15 +193,42 @@ public class FileManager {
 
 					for(int j = 0; j < sellerAmt; j++){
 
+						int agentType = -1;
 						sellers[j] = in.readLine();
 						prices[j] = Integer.parseInt(sellers[j].split("=")[1].split(",")[0]);
 						offerAmt = Integer.parseInt(sellers[j].split("=")[1].split(",")[1]);
+						agentType = Integer.parseInt(sellers[j].split("=")[1].split(",")[2]);
 						sellers[j] = sellers[j].split("=")[0];
 						offerers = new String[offerAmt];
 						offerprices = new int[offerAmt];
+						
 						line = in.readLine();
+						
+						if(agentType == 0){
+							
+							String[] args = line.split(",");
+							int w = Integer.parseInt(args[0]), price = Integer.parseInt(args[6]);
+							double x = Double.parseDouble(args[1]), y = Double.parseDouble(args[2]), z = Double.parseDouble(args[3]);
+							float yaw = Float.parseFloat(args[4]), pitch = Float.parseFloat(args[5]);
+							World world = RegionMarket.server.getWorlds().get(w);
+							Location loc = new Location(world, x, y, z, yaw, pitch);
+							plugin.getMarketManager().getAgentManager().addAgentToWorld(world, loc, sellers[j], region, price);
+							line = in.readLine();
+							
+						} else if(agentType == 1){
+							
+							String[] args = line.split(",");
+							int w = Integer.parseInt(args[0]), price = Integer.parseInt(args[4]);
+							double x = Double.parseDouble(args[1]), y = Double.parseDouble(args[2]), z = Double.parseDouble(args[3]);
+							World world = RegionMarket.server.getWorlds().get(w);
+							Location loc = new Location(world, x, y, z);
+							plugin.getMarketManager().getAgentManager().addSignToWorld(loc, sellers[j], region, price);
+							line = in.readLine();
+							
+						}
+						
 						if(line != null){
-
+							
 							String[] offerline = line.split(",");
 							plugin.getMarketManager().addRegionSale(region, sellers[j], prices[j]);
 							for(int k = 0, l = 0, p1 = 0, p2 = 1; k < offerAmt; k++, l++, p1+=2, p2+=2){

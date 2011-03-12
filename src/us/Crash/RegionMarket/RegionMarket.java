@@ -1,26 +1,43 @@
 package us.Crash.RegionMarket;
 
+import java.util.List;
+
 import org.bukkit.ChatColor;
 import org.bukkit.Server;
+import org.bukkit.block.Block;
+import org.bukkit.block.Sign;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockListener;
+import org.bukkit.event.block.BlockRightClickEvent;
+import org.bukkit.event.block.SignChangeEvent;
+import org.bukkit.event.entity.*;
+import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
+import org.bukkit.event.server.PluginEvent;
+import org.bukkit.event.server.ServerListener;
 import org.bukkit.plugin.java.JavaPlugin;
-
 import com.nijiko.coelho.iConomy.iConomy;
+import com.nijiko.coelho.iConomy.system.Account;
 import com.nijikokun.bukkit.Permissions.*;
+import com.sk89q.worldedit.Vector;
 import com.sk89q.worldguard.bukkit.WorldGuardPlugin;
 import com.sk89q.worldguard.protection.ProtectedRegion;
 
 public class RegionMarket extends JavaPlugin {
 
 	public static Server server;
-	public static WorldGuardPlugin worldguard = null;
+	public static WorldGuardPlugin WorldGuard = null;
 	public static iConomy iConomy = null;
 	public static Permissions Permissions = null;
 	public static int ERR_ARG = 0, ERR_NAME = 1, ERR_NOOWN = 2, ERR_MONEY = 3, ERR_NOSALE = 4, ERR_OWN = 5;
 	private RegionMarketManager marketManager = new RegionMarketManager();
 	private FileManager FileMgr;
+	private SListener serverListener = new SListener();
+	private EListener entityListener = new EListener(this);
+	private BListener blockListener = new BListener(this);
 
 	public RegionMarketManager getMarketManager(){
 
@@ -51,6 +68,8 @@ public class RegionMarket extends JavaPlugin {
 			return Permissions.getHandler().permission(player, "regionmarket.list");
 		if(command.equals("accept") || command.equals("a"))
 			return Permissions.getHandler().permission(player, "regionmarket.accept");
+		if(command.equals("agent"))
+			return Permissions.getHandler().permission(player, "regionmarket.agent");
 		if(command.equals("reload"))
 			return Permissions.getHandler().permission(player, "regionmarket.reload");
 		if(command.equals("save"))
@@ -115,14 +134,14 @@ public class RegionMarket extends JavaPlugin {
 	public void onDisable() {
 
 		if(FileMgr != null){
-			
+
 			FileMgr.saveData();
-			outputConsole("Finished saving, v0.1 disabled.");
-			
+			outputConsole("Finished saving, v" + getDescription().getVersion() + " disabled.");
+
 		} else {
-			
-			outputConsole("v0.1 disabled.");
-			
+
+			outputConsole("v" + getDescription().getVersion() + " disabled.");
+
 		}
 
 	}
@@ -132,11 +151,11 @@ public class RegionMarket extends JavaPlugin {
 
 		server = getServer();
 
-		worldguard = (WorldGuardPlugin)server.getPluginManager().getPlugin("WorldGuard");
+		WorldGuard = (WorldGuardPlugin)server.getPluginManager().getPlugin("WorldGuard");
 		iConomy = (iConomy)server.getPluginManager().getPlugin("iConomy");
 		Permissions = (Permissions)server.getPluginManager().getPlugin("Permissions");
 
-		if(worldguard == null){
+		if(WorldGuard == null){
 
 			outputConsole("Unable to find WorldGuard plugin.");
 			server.getPluginManager().disablePlugin(this);
@@ -153,26 +172,29 @@ public class RegionMarket extends JavaPlugin {
 			outputConsole("Unable to find Permissions plugin.");
 			outputConsole("CAUTION : There are no restrictions on commands!");
 
-		} else if(worldguard != null && iConomy != null && Permissions != null)
+		} else if(WorldGuard != null && iConomy != null && Permissions != null)
 			outputConsole("Found and hooked all plugins successfully.");
 
 
 		FileMgr = new FileManager("plugins/RegionMarket/", "saveData.txt", this);
 
-		outputConsole("Loaded version v0.1, by Crash");
+		server.getPluginManager().registerEvent(Event.Type.PLUGIN_ENABLE, serverListener, Event.Priority.Normal, this);
+		server.getPluginManager().registerEvent(Event.Type.ENTITY_DAMAGED, entityListener, Event.Priority.Normal, this);
+		server.getPluginManager().registerEvent(Event.Type.BLOCK_BREAK, blockListener, Event.Priority.Normal, this);
+		server.getPluginManager().registerEvent(Event.Type.BLOCK_RIGHTCLICKED, blockListener, Event.Priority.Normal, this);
+		server.getPluginManager().registerEvent(Event.Type.SIGN_CHANGE, blockListener, Event.Priority.Normal, this);
+		
+		outputConsole("Loaded v" + getDescription().getVersion() + ", by Crash");
 
 	}
 
 	@SuppressWarnings("static-access")
 	@Override
 	public boolean onCommand(CommandSender sender, Command command, String commandLabel, String[] args) {
-		
+
 		if(!(sender instanceof Player))
 			return false;
 
-		if(!getServer().getPluginManager().isPluginEnabled("RegionMarket"))
-			return false;
-		
 		Player p = (Player)sender;
 
 		if(command.getName().equalsIgnoreCase("rm")){
@@ -425,7 +447,7 @@ public class RegionMarket extends JavaPlugin {
 						outputDebug(p, "You have removed your offer.");
 
 					} else if(args[1].equalsIgnoreCase("-r")){
-						
+
 						ProtectedRegion region = marketManager.getRegion(args[2]);
 
 						if(region == null)
@@ -464,8 +486,111 @@ public class RegionMarket extends JavaPlugin {
 				if(marketManager.acceptOffer(region, p.getName(), args[2]))
 					outputDebug(p, "You have sold your ownership to " + args[2] + ".");
 
+			} else if(args[0].equalsIgnoreCase("agent")){ 
+
+				if(args.length < 3)
+					return outputError(p, ERR_ARG);
+
+				if(!args[1].contains("-")){
+
+					outputError(p, "Use the flag -a, -m, or -r!");
+
+				} else {
+
+					args[1] = args[1].toLowerCase();
+
+					if(args[1].equals("-a")){
+
+						if(args.length < 4)
+							return outputError(p, "Correct usage : /rm agent -a <region> <price>");
+
+						ProtectedRegion region = marketManager.getRegion(args[2]);
+
+						if(region == null)
+							return outputError(p, ERR_NAME);
+
+						if(!marketManager.isOwner(p, region))
+							return outputError(p, ERR_NOOWN);
+
+						if(!marketManager.isPlayerSelling(region, p.getName()))
+							return outputError(p, "You aren't selling that region!");
+
+						if(marketManager.getAgentManager().hasAddedAgent(p.getName(), region.getId()))
+							return outputError(p, "You've already added an agent to the region!");
+						
+						Integer price = null;
+
+						try {
+
+							price = Integer.parseInt(args[3]);
+
+						} catch(Exception e){
+
+							return outputError(p, "Unknown price \"" + args[3] + "\".");
+
+						}
+						
+						if(price < 1)
+							return outputError(p, "Put in a price greater than 0!");
+
+						marketManager.getAgentManager().addAgentToWorld(p.getWorld(), p.getLocation(), p.getName(), region.getId(), price);
+						outputDebug(p, "You've added your agent!");
+
+					} else if(args[1].equals("-r")){
+
+						ProtectedRegion region = marketManager.getRegion(args[2]);
+
+						if(region == null)
+							return outputError(p, ERR_NAME);
+
+						if(!marketManager.isOwner(p, region))
+							return outputError(p, ERR_NOOWN);
+
+						if(!marketManager.isPlayerSelling(region, p.getName()))
+							return outputError(p, "You aren't selling that region!");
+
+						if(!marketManager.getAgentManager().hasAddedAgent(p.getName(), region.getId()))
+							return outputError(p, "You haven't added an agent to the region!");
+
+						if(marketManager.getAgentManager().removeAgentFromWorld(p.getName(), region.getId(), true)){
+							
+							outputDebug(p, "You removed the agent.");
+							return true;
+							
+						} else
+							return outputError(p, "An error occured when trying to remove the agent.");
+
+					} else if(args[1].equals("-m")){
+						
+						ProtectedRegion region = marketManager.getRegion(args[2]);
+
+						if(region == null)
+							return outputError(p, ERR_NAME);
+
+						if(!marketManager.isOwner(p, region))
+							return outputError(p, ERR_NOOWN);
+
+						if(!marketManager.isPlayerSelling(region, p.getName()))
+							return outputError(p, "You aren't selling that region!");
+
+						if(!marketManager.getAgentManager().hasAddedAgent(p.getName(), region.getId()))
+							return outputError(p, "You haven't added an agent to that region!");
+						
+						RegionAgent agent = marketManager.getAgentManager().getAgent(p.getName(), region.getId());
+						agent.moveTo(p.getLocation());
+						outputDebug(p, "You've moved your agent.");
+						
+					} else {
+						
+						return outputError(p, "Unknown flag.");
+						
+					}
+
+				}
+
 			} else if(args[0].equalsIgnoreCase("reload")){
 
+				marketManager.getAgentManager().removeAllAgents();
 				marketManager = new RegionMarketManager();
 
 				if(FileMgr.loadData(p)){
@@ -493,44 +618,49 @@ public class RegionMarket extends JavaPlugin {
 					p.sendMessage(ChatColor.YELLOW + "  /rm sell/s <" + ChatColor.WHITE + "region" + ChatColor.YELLOW + "> <" + ChatColor.WHITE + "price" + ChatColor.YELLOW + ">");
 					p.sendMessage(ChatColor.YELLOW + "  /rm offer/o <" + ChatColor.WHITE + "region" + ChatColor.YELLOW + "> <" + ChatColor.WHITE + "player" + ChatColor.YELLOW + "> <" + ChatColor.WHITE + "offerprice" + ChatColor.YELLOW + ">");
 					p.sendMessage(ChatColor.YELLOW + "  /rm remove/r <" + ChatColor.WHITE + "flag" + ChatColor.YELLOW + "> <"  + ChatColor.WHITE + "region" + ChatColor.YELLOW + "> <"  + ChatColor.WHITE + "seller" + ChatColor.YELLOW + ">");
-					p.sendMessage(ChatColor.YELLOW + "  /rm accept/a <" + ChatColor.WHITE + "region" + ChatColor.YELLOW + "> <"  + ChatColor.WHITE +  "player"  + ChatColor.YELLOW +  ">");
+					p.sendMessage(ChatColor.YELLOW + "  /rm accept/a <" + ChatColor.WHITE + "region" + ChatColor.YELLOW + "> <"  + ChatColor.WHITE +  "buyer"  + ChatColor.YELLOW +  ">");
 					p.sendMessage(ChatColor.YELLOW + "  /rm list/l (" + ChatColor.WHITE + "flag" + ChatColor.YELLOW + ") ... ("  + ChatColor.WHITE + "page" + ChatColor.YELLOW + ")");
+					p.sendMessage(ChatColor.YELLOW + "  /rm agent <" + ChatColor.WHITE + "flag" + ChatColor.YELLOW + "> <"  + ChatColor.WHITE + "region" + ChatColor.YELLOW + "> ...");
 					p.sendMessage(ChatColor.YELLOW + "  /rm reload | /rm save");
 
 				} else {
-					
+
 					args[1] = args[1].toLowerCase();
-					
+
 					if(args[1].equals("sell") || args[1].equals("s")){
-						
+
 						p.sendMessage("/rm sell/s <" + ChatColor.WHITE + "region" + ChatColor.YELLOW + "> <" + ChatColor.WHITE + "price" + ChatColor.YELLOW + "> - " + ChatColor.WHITE + "Puts your region ownership on the market with the set minimum price.");
-						
+
 					} else if(args[1].equals("offer") || args[1].equals("o")){
-						
+
 						p.sendMessage(ChatColor.YELLOW + "/rm offer/o <" + ChatColor.WHITE + "region" + ChatColor.YELLOW + "> <" + ChatColor.WHITE + "player" + ChatColor.YELLOW + "> <" + ChatColor.WHITE + "offerprice" + ChatColor.YELLOW + "> - " + ChatColor.WHITE + "Places your offer on thplayer's sale of the region.");
-						
+
 					} else if(args[1].equals("remove") || args[1].equals("r")){
-						
-						p.sendMessage(ChatColor.YELLOW + "  /rm remove/r <" + ChatColor.WHITE + "flag" + ChatColor.YELLOW + "> <"  + ChatColor.WHITE + "region" + ChatColor.YELLOW + "> - " + ChatColor.WHITE + "Removes either an offer you made on the region using the flag -o or the region from the market with the flag -r");
-						
+
+						p.sendMessage(ChatColor.YELLOW + "/rm remove/r <" + ChatColor.WHITE + "flag" + ChatColor.YELLOW + "> <"  + ChatColor.WHITE + "region" + ChatColor.YELLOW + "> - " + ChatColor.WHITE + "Removes either an offer you made on the seller's sale of the region using the flag -o or the region from the market with the flag -r.(Seller isn't used for -r)");
+
 					} else if(args[1].equals("accept") || args[1].equals("a")){
-						
-						p.sendMessage(ChatColor.YELLOW + "  /rm accept/a <" + ChatColor.WHITE + "region" + ChatColor.YELLOW + "> <"  + ChatColor.WHITE +  "player"  + ChatColor.YELLOW +  "> - " + ChatColor.WHITE + "Accepts player's offer on your sale of the region. (The player must have enough money at the time you accept the offer)" );
-						
+
+						p.sendMessage(ChatColor.YELLOW + "/rm accept/a <" + ChatColor.WHITE + "region" + ChatColor.YELLOW + "> <"  + ChatColor.WHITE +  "buyer"  + ChatColor.YELLOW +  "> - " + ChatColor.WHITE + "Accepts the buyer's offer on your sale of the region. (The player must have enough money at the time you accept the offer)" );
+
 					} else if(args[1].equals("list") || args[1].equals("l")){
-						
-						p.sendMessage(ChatColor.YELLOW + "  /rm list/l (" + ChatColor.WHITE + "flag" + ChatColor.YELLOW + ") ... ("  + ChatColor.WHITE + "page" + ChatColor.YELLOW + ") - " + ChatColor.WHITE + "Lists different info. The flag -a is used to list all regions on the market, the flag -p is used to list the regions a player is selling(... is the player name), the flag -r is used to list all sales for a region(... is the region name), the flag -o is used to list all offers on your sale of a region(... is the region name). The default page is 1 and the default flag is -a if either one is not specified.");
-						
+
+						p.sendMessage(ChatColor.YELLOW + "/rm list/l (" + ChatColor.WHITE + "flag" + ChatColor.YELLOW + ") ... ("  + ChatColor.WHITE + "page" + ChatColor.YELLOW + ") - " + ChatColor.WHITE + "Lists different info. The flag -a is used to list all regions on the market, the flag -p is used to list the regions a player is selling(... is the player name), the flag -r is used to list all sales for a region(... is the region name), the flag -o is used to list all offers on your sale of a region(... is the region name). The default page is 1 and the default flag is -a if either one is not specified.");
+
+					} else if(args[1].equals("agent")){
+
+						p.sendMessage(ChatColor.YELLOW + "/rm agent <" + ChatColor.WHITE + "flag" + ChatColor.YELLOW + "> <"  + ChatColor.WHITE + "region" + ChatColor.YELLOW + "> ... - " + ChatColor.WHITE + "Agents sell regions for you. When adding an agent to a region use the flag -a and the region name to sell. To remove an agent use -r and the region name. Use -m and the region name to move the agent to your position.");
+
 					} else if(args[1].equals("reload")){
-						
-						p.sendMessage(ChatColor.YELLOW + "  /rm reload - " + ChatColor.WHITE + "Reloads the data from the save file. (Doesn't save before reloading!");
-						
+
+						p.sendMessage(ChatColor.YELLOW + "/rm reload - " + ChatColor.WHITE + "Reloads the data from the save file. (Doesn't save before reloading!");
+
 					} else if(args[1].equals("save")){
-						
-						p.sendMessage(ChatColor.YELLOW + "  /rm save - " + ChatColor.WHITE + "Saves the current market data into the save file.");
-						
+
+						p.sendMessage(ChatColor.YELLOW + "/rm save - " + ChatColor.WHITE + "Saves the current market data into the save file.");
+
 					}
-					
+
 				}
 
 			} else {
@@ -542,6 +672,246 @@ public class RegionMarket extends JavaPlugin {
 		}
 
 		return true;
+
+	}
+
+}
+
+class SListener extends ServerListener {
+
+	@Override
+	public void onPluginEnabled(PluginEvent event){
+
+		String name = event.getPlugin().getDescription().getName().toLowerCase();
+
+		if(name.equals("permissions") && RegionMarket.Permissions == null){
+
+			RegionMarket.Permissions = (Permissions)event.getPlugin();
+			RegionMarket.outputConsole("Secondary hook on Permissions.");
+
+		}
+		if(name.equals("worldguard") && RegionMarket.WorldGuard == null){
+
+			RegionMarket.WorldGuard = (WorldGuardPlugin)event.getPlugin();
+			RegionMarket.outputConsole("Secondary hook on WorldGuard.");
+
+		}
+		if(name.equals("iconomy") && RegionMarket.iConomy == null){
+
+			RegionMarket.iConomy = (iConomy)event.getPlugin();
+			RegionMarket.outputConsole("Secondary hook on iConomy.");
+
+		}
+
+
+
+	}
+
+
+}
+
+class BListener extends BlockListener {
+
+	RegionMarket plugin;
+
+	public BListener(RegionMarket p){
+
+		plugin = p;
+
+	}
+
+	@Override
+	public void onSignChange(SignChangeEvent event){
+		
+		if(event.getLine(0).equals("[AGENT]")){
+
+			String[] info = event.getLine(1).split(" - ");
+
+			if(info.length < 2){
+				
+				RegionMarket.outputError(event.getPlayer(), "Unable to get region name/price.");
+				return;
+				
+			}
+			
+			int price = 0;
+			
+			try {
+
+				price = Integer.parseInt(info[1]);
+
+			} catch(Exception e){
+
+				RegionMarket.outputError(event.getPlayer(), "Unknown price \"" + info[1] + "\".");
+				return;
+
+			}
+			
+			if(price < 1){
+				
+				RegionMarket.outputError(event.getPlayer(), "Put a price in that is greater than 0!");
+				
+			}
+			
+			ProtectedRegion region = plugin.getMarketManager().getRegion(info[0]);
+			Player p = event.getPlayer();
+			
+			if(region == null){
+				
+				RegionMarket.outputError(p, RegionMarket.ERR_NAME);
+				event.setCancelled(true);
+				return;
+				
+			}
+
+			if(!plugin.getMarketManager().isOwner(p, region)){
+				
+				RegionMarket.outputError(p, RegionMarket.ERR_NOOWN);
+				event.setCancelled(true);
+				return;
+				
+			}
+
+			if(!plugin.getMarketManager().isPlayerSelling(region, p.getName())){
+				
+				RegionMarket.outputError(p, "You aren't selling that region!");
+				event.setCancelled(true);
+				return;
+				
+			}
+
+			if(plugin.getMarketManager().getAgentManager().hasAddedAgent(p.getName(), region.getId())){
+				
+				RegionMarket.outputError(p, "You've already added an agent to the region!");
+				event.setCancelled(true);
+				return;
+				
+			}
+			
+			plugin.getMarketManager().getAgentManager().addSignToWorld(event.getBlock().getLocation(), event.getPlayer().getName(), info[0], price);
+			RegionMarket.outputDebug(event.getPlayer(), "You've successfully made your agent!");
+
+		}
+
+	}
+
+	@Override
+	public void onBlockRightClick(BlockRightClickEvent event){
+
+		Block b = event.getBlock();
+		if(b.getTypeId() == 63 || b.getTypeId() == 68){
+
+			Sign sign = (Sign)b.getState();
+
+			if(sign.getLine(0).equals("[AGENT]")){
+
+				RegionAgent agent = plugin.getMarketManager().getAgentManager().getAgent(b.getLocation());
+
+				if(agent == null)
+					return;
+
+				if(agent.getSeller().equalsIgnoreCase(event.getPlayer().getName())){
+					
+					event.getPlayer().sendMessage(ChatColor.YELLOW + "[NPC]Destroy me to stop me from selling.");
+					return;
+					
+				}
+				
+				Account buyAcc = iConomy.getBank().getAccount(event.getPlayer().getName()), sellAcc = iConomy.getBank().getAccount(agent.getSeller());
+				ProtectedRegion region = plugin.getMarketManager().getRegion(agent.getRegion());
+				
+				if(buyAcc == null || sellAcc == null || region == null)
+					return;
+				
+				if(!buyAcc.hasEnough(agent.getPrice())){
+					
+					event.getPlayer().sendMessage(ChatColor.YELLOW + "[NPC]Sorry, you don't have enough money.");
+					return;
+					
+				}
+				
+				region.getOwners().addPlayer(event.getPlayer().getName());
+				region.getOwners().removePlayer(agent.getSeller());
+				buyAcc.subtract(agent.getPrice());
+				sellAcc.add(agent.getPrice());
+				buyAcc.save();
+				sellAcc.save();
+				
+				event.getPlayer().sendMessage(ChatColor.YELLOW + "Congratulations, you now own " + agent.getRegion() + "!");
+				Player p = RegionMarket.getPlayer(agent.getSeller());
+				if(p != null)
+					RegionMarket.outputDebug(p, event.getPlayer().getName() + " has bought your region, " + agent.getRegion() + "!");
+				plugin.getMarketManager().removeRegionSale(region, agent.getSeller());
+
+			}
+
+		}
+
+	}
+
+	@Override
+	public void onBlockBreak(BlockBreakEvent event){
+		Block b = event.getBlock();
+		if(b.getTypeId() == 63 || b.getTypeId() == 68){
+
+			Sign sign = (Sign)b.getState();
+
+			if(sign.getLine(0).equals("[AGENT]")){
+
+				RegionAgent agent = plugin.getMarketManager().getAgentManager().getAgent(b.getLocation());
+
+				if(agent == null)
+					return;
+
+				if(!agent.getSeller().equalsIgnoreCase(event.getPlayer().getName())){
+
+					event.setCancelled(true);
+					return;
+
+				}
+				
+				plugin.getMarketManager().getAgentManager().removeAgentFromWorld(agent);
+				RegionMarket.outputDebug(event.getPlayer(), "You have removed your agent.");
+
+			}
+
+		}
+
+	}
+
+}
+
+class EListener extends EntityListener {
+
+	private RegionMarket plugin;
+
+	public EListener(RegionMarket p){
+
+		plugin = p;
+
+	}
+	
+	@Override
+	public void onEntityDamage(EntityDamageEvent event){
+		
+		if(!(event instanceof EntityDamageByEntityEvent))
+			return;
+
+		EntityDamageByEntityEvent e = (EntityDamageByEntityEvent)event;
+
+		if(!(e.getDamager() instanceof Player))
+			return;
+		
+		if(e.getCause().equals(DamageCause.ENTITY_ATTACK)){
+
+			RegionAgent agent = plugin.getMarketManager().getAgentManager().getAgent(e.getEntity());
+
+			if(agent == null)
+				return;
+
+			plugin.getMarketManager().getAgentManager().leftClickCallback(e.getDamager(), agent);
+
+		}
 
 	}
 
