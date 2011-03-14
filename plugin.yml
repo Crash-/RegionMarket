@@ -1,4 +1,4 @@
-name: Region Market
+name: RegionMarket
 version: 0.2
 main: us.Crash.RegionMarket.RegionMarket
 commands:

@@ -42,9 +42,9 @@ public class AgentManager {
 
 		r.getAgent().c(loc.getX(), loc.getY(), loc.getZ(), loc.getYaw(), loc.getPitch());
 
-		w.c(MathHelper.b((int)r.getAgent().locX / 16.0D), (int)MathHelper.b(r.getAgent().locX / 16.0D)).a(r.getAgent());
+		w.c((int)MathHelper.b(r.getAgent().locX / 16.0D), (int)MathHelper.b(r.getAgent().locZ / 16.0D)).a(r.getAgent());
 		w.b.add(r.getAgent());
-
+		
 		try {
 
 			Method method;

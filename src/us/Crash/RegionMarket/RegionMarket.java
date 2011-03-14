@@ -1,7 +1,5 @@
 package us.Crash.RegionMarket;
 
-import java.util.List;
-
 import org.bukkit.ChatColor;
 import org.bukkit.Server;
 import org.bukkit.block.Block;
@@ -22,7 +20,6 @@ import org.bukkit.plugin.java.JavaPlugin;
 import com.nijiko.coelho.iConomy.iConomy;
 import com.nijiko.coelho.iConomy.system.Account;
 import com.nijikokun.bukkit.Permissions.*;
-import com.sk89q.worldedit.Vector;
 import com.sk89q.worldguard.bukkit.WorldGuardPlugin;
 import com.sk89q.worldguard.protection.ProtectedRegion;
 
@@ -649,7 +646,7 @@ public class RegionMarket extends JavaPlugin {
 
 					} else if(args[1].equals("agent")){
 
-						p.sendMessage(ChatColor.YELLOW + "/rm agent <" + ChatColor.WHITE + "flag" + ChatColor.YELLOW + "> <"  + ChatColor.WHITE + "region" + ChatColor.YELLOW + "> ... - " + ChatColor.WHITE + "Agents sell regions for you. When adding an agent to a region use the flag -a and the region name to sell. To remove an agent use -r and the region name. Use -m and the region name to move the agent to your position.");
+						p.sendMessage(ChatColor.YELLOW + "/rm agent <" + ChatColor.WHITE + "flag" + ChatColor.YELLOW + "> <"  + ChatColor.WHITE + "region" + ChatColor.YELLOW + "> ... - " + ChatColor.WHITE + "Agents sell regions for you. When adding an agent to a region use the flag -a, the region name to sell, and the price. To remove an agent use -r and the region name. Use -m and the region name to move the agent to your position.");
 
 					} else if(args[1].equals("reload")){
 
@@ -799,10 +796,11 @@ class BListener extends BlockListener {
 	public void onBlockRightClick(BlockRightClickEvent event){
 
 		Block b = event.getBlock();
+		
 		if(b.getTypeId() == 63 || b.getTypeId() == 68){
 
 			Sign sign = (Sign)b.getState();
-
+			
 			if(sign.getLine(0).equals("[AGENT]")){
 
 				RegionAgent agent = plugin.getMarketManager().getAgentManager().getAgent(b.getLocation());
@@ -866,6 +864,7 @@ class BListener extends BlockListener {
 				if(!agent.getSeller().equalsIgnoreCase(event.getPlayer().getName())){
 
 					event.setCancelled(true);
+					sign.update();
 					return;
 
 				}

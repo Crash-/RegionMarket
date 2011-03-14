@@ -197,7 +197,13 @@ public class FileManager {
 						sellers[j] = in.readLine();
 						prices[j] = Integer.parseInt(sellers[j].split("=")[1].split(",")[0]);
 						offerAmt = Integer.parseInt(sellers[j].split("=")[1].split(",")[1]);
-						agentType = Integer.parseInt(sellers[j].split("=")[1].split(",")[2]);
+						try {
+							agentType = Integer.parseInt(sellers[j].split("=")[1].split(",")[2]);
+						} catch(ArrayIndexOutOfBoundsException e){
+							
+							agentType = -1;
+							
+						}
 						sellers[j] = sellers[j].split("=")[0];
 						offerers = new String[offerAmt];
 						offerprices = new int[offerAmt];
