@@ -1,5 +1,5 @@
 name: RegionMarket
-version: 0.2
+version: 0.3
 main: us.Crash.RegionMarket.RegionMarket
 commands:
   rm:

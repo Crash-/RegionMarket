@@ -50,7 +50,7 @@ public class FileManager {
 				
 				RegionAgent agent = plugin.getMarketManager().getAgentManager().getAgent(sales.get(i).getSeller(), region);
 				
-				writeLine(sales.get(i).getSeller() + "=" + sales.get(i).getPrice() + "," + offers.size() + "," + (agent == null ? -1 : agent.getType()));
+				writeLine(sales.get(i).getSeller() + "=" + sales.get(i).getPrice() + "," + offers.size() + "," + (agent == null ? -1 : agent.getType()) + "," + (sales.get(i).isInstant() ? "1" : "0"));
 				if(agent != null){
 				
 					if(agent.getType() == 0)
@@ -146,6 +146,7 @@ public class FileManager {
 			int sellerAmt, offerAmt;
 			String[] sellers, offerers;
 			int[] prices, offerprices;
+			boolean[] instant;
 
 			for(int i = 0; i < numTimes; i++){
 
@@ -190,6 +191,7 @@ public class FileManager {
 					region = region.split("=")[1].split(",")[0];
 					sellers = new String[sellerAmt];
 					prices = new int[sellerAmt];
+					instant = new boolean[sellerAmt];
 
 					for(int j = 0; j < sellerAmt; j++){
 
@@ -200,9 +202,12 @@ public class FileManager {
 						try {
 							agentType = Integer.parseInt(sellers[j].split("=")[1].split(",")[2]);
 						} catch(ArrayIndexOutOfBoundsException e){
-							
 							agentType = -1;
-							
+						}
+						try{
+							instant[j] = (sellers[j].split("=")[1].split(",")[3].equals("1") ? true : false);
+						} catch(ArrayIndexOutOfBoundsException e){
+							instant[j] = false;
 						}
 						sellers[j] = sellers[j].split("=")[0];
 						offerers = new String[offerAmt];
@@ -236,7 +241,7 @@ public class FileManager {
 						if(line != null){
 							
 							String[] offerline = line.split(",");
-							plugin.getMarketManager().addRegionSale(region, sellers[j], prices[j]);
+							plugin.getMarketManager().addRegionSale(region, sellers[j], prices[j], instant[j]);
 							for(int k = 0, l = 0, p1 = 0, p2 = 1; k < offerAmt; k++, l++, p1+=2, p2+=2){
 
 								offerers[k] = offerline[p1];

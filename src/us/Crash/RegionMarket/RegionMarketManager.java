@@ -4,11 +4,12 @@ import java.util.HashMap;
 import java.util.Iterator;
 
 import org.bukkit.ChatColor;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import com.nijiko.coelho.iConomy.iConomy;
 import com.nijiko.coelho.iConomy.system.Account;
 import com.sk89q.worldguard.bukkit.BukkitPlayer;
-import com.sk89q.worldguard.protection.ProtectedRegion;
+import com.sk89q.worldguard.protection.regions.*;
 
 public class RegionMarketManager {
 
@@ -84,9 +85,9 @@ public class RegionMarketManager {
 
 	}
 
-	public ProtectedRegion getRegion(String name){
+	public ProtectedRegion getRegion(World w, String name){
 
-		return RegionMarket.WorldGuard.getRegionManager().getRegion(name);
+		return RegionMarket.WorldGuard.getGlobalRegionManager().get(w).getRegion(name);
 
 	}
 
@@ -247,12 +248,12 @@ public class RegionMarketManager {
 
 	}
 
-	public void addRegionSale(ProtectedRegion region, Player seller, int price){
+	public void addRegionSale(ProtectedRegion region, Player seller, int price, boolean instant){
 
 		if(!isOnMarket(region))
 			regionList.put(region.getId(), new ArrayList<RegionSale>());
 
-		regionList.get(region.getId()).add(new RegionSale(seller.getName(), region.getId(), price));
+		regionList.get(region.getId()).add(new RegionSale(seller.getName(), region.getId(), price, instant));
 
 	}
 
@@ -308,12 +309,12 @@ public class RegionMarketManager {
 
 	}
 
-	public void addRegionSale(String region, String seller, int price){
+	public void addRegionSale(String region, String seller, int price, boolean instant){
 
 		if(!isOnMarket(region))
 			regionList.put(region, new ArrayList<RegionSale>());
 
-		regionList.get(region).add(new RegionSale(seller, region, price));
+		regionList.get(region).add(new RegionSale(seller, region, price, instant));
 
 	}
 
@@ -335,8 +336,6 @@ public class RegionMarketManager {
 			region.getOwners().addPlayer(buyer);
 			sellAcc.setBalance(sellAcc.getBalance() + o.getPrice());
 			buyAcc.setBalance(buyAcc.getBalance() - o.getPrice());
-			sellAcc.save();
-			buyAcc.save();
 			Player p = RegionMarket.getPlayer(buyer);
 			if(p != null)
 				p.sendMessage(ChatColor.AQUA + "[RegionMarket] " + ChatColor.YELLOW + seller + " has sold you their region " + region.getId() + "!");
@@ -450,7 +449,7 @@ public class RegionMarketManager {
 			}
 
 			p.sendMessage(ChatColor.GREEN + "Showing all regions for sale; Page " + ChatColor.WHITE + (page + 1) + ChatColor.GREEN + " of " + ChatColor.WHITE + (int)Math.ceil(size / 7.0));
-			p.sendMessage(ChatColor.GREEN + "<" + ChatColor.WHITE + "region" + ChatColor.GREEN + ">" + ChatColor.YELLOW + " - " + ChatColor.GREEN + "<" + ChatColor.WHITE + "seller" + ChatColor.GREEN + ">" + ChatColor.YELLOW + " - " + ChatColor.GREEN + "<" + ChatColor.WHITE + "price" + ChatColor.GREEN + ">");
+			p.sendMessage(ChatColor.GREEN + "<" + ChatColor.WHITE + "region" + ChatColor.GREEN + ">" + ChatColor.YELLOW + " - " + ChatColor.GREEN + "<" + ChatColor.WHITE + "seller" + ChatColor.GREEN + ">" + ChatColor.YELLOW + " - " + ChatColor.GREEN + "<" + ChatColor.WHITE + "price" + ChatColor.GREEN + ">" + ChatColor.YELLOW + " - " + ChatColor.GREEN + "<" + ChatColor.WHITE + "instant" + ChatColor.GREEN + ">");
 
 			int i = 0;
 			boolean passed = false;
@@ -462,7 +461,7 @@ public class RegionMarketManager {
 					for(int j = 0; i >= page * 7 && i < (page + 1) * 7 && j < regionList.get(key).size(); j++){
 
 						RegionSale s = regionList.get(key).get(j);
-						p.sendMessage(ChatColor.GREEN + key + ChatColor.YELLOW + " - " + ChatColor.GREEN + s.getSeller() + ChatColor.YELLOW + " - " + ChatColor.GREEN + s.getPrice());
+						p.sendMessage(ChatColor.GREEN + key + ChatColor.YELLOW + " - " + ChatColor.GREEN + s.getSeller() + ChatColor.YELLOW + " - " + ChatColor.GREEN + s.getPrice() + ChatColor.YELLOW + " - " + ChatColor.GREEN + s.isInstant());
 						i++;
 
 					}
@@ -505,12 +504,12 @@ public class RegionMarketManager {
 				}
 
 				p.sendMessage(ChatColor.GREEN + "Showing " + player + "'s regions on the market; Page " + ChatColor.WHITE + (page + 1) + ChatColor.GREEN + " of " + ChatColor.WHITE + (int)Math.ceil(sales.size() / 7.0));
-				p.sendMessage(ChatColor.GREEN + "<" + ChatColor.WHITE + "region" + ChatColor.GREEN + ">" + ChatColor.YELLOW + " - " + ChatColor.GREEN + "<" + ChatColor.WHITE + "price" + ChatColor.GREEN + ">");
+				p.sendMessage(ChatColor.GREEN + "<" + ChatColor.WHITE + "region" + ChatColor.GREEN + ">" + ChatColor.YELLOW + " - " + ChatColor.GREEN + "<" + ChatColor.WHITE + "price" + ChatColor.GREEN + ">" + ChatColor.YELLOW + " - " + ChatColor.GREEN + "<" + ChatColor.WHITE + "instant" + ChatColor.GREEN + ">");
 
 				for(int j = 0, i = page * 7; j < 7 && i < sales.size(); j++, i++){
 
 					RegionSale s = sales.get(i);
-					p.sendMessage(ChatColor.GREEN + s.getRegion() + ChatColor.YELLOW + " - " + ChatColor.GREEN + s.getPrice());
+					p.sendMessage(ChatColor.GREEN + s.getRegion() + ChatColor.YELLOW + " - " + ChatColor.GREEN + s.getPrice() + ChatColor.YELLOW + " - " + s.isInstant());
 
 				}
 
@@ -550,12 +549,12 @@ public class RegionMarketManager {
 				}
 
 				p.sendMessage(ChatColor.GREEN + "Showing sales for region " + region + "; Page " + ChatColor.WHITE + (page + 1) + ChatColor.GREEN + " of " + ChatColor.WHITE + (int)Math.ceil(sales.size() / 7.0));
-				p.sendMessage(ChatColor.GREEN + "<" + ChatColor.WHITE + "seller" + ChatColor.GREEN + ">" + ChatColor.YELLOW + " - " + ChatColor.GREEN + "<" + ChatColor.WHITE + "price" + ChatColor.GREEN + ">");
+				p.sendMessage(ChatColor.GREEN + "<" + ChatColor.WHITE + "seller" + ChatColor.GREEN + ">" + ChatColor.YELLOW + " - " + ChatColor.GREEN + "<" + ChatColor.WHITE + "price" + ChatColor.GREEN + ">" + ChatColor.YELLOW + " - " + ChatColor.GREEN + "<" + ChatColor.WHITE + "instant" + ChatColor.GREEN + ">");
 
 				for(int j = 0, i = page * 7; j < 7 && i < sales.size(); j++, i++){
 
 					RegionSale s = sales.get(i);
-					p.sendMessage(ChatColor.GREEN + s.getSeller() + ChatColor.YELLOW + " - " + ChatColor.GREEN + s.getPrice());
+					p.sendMessage(ChatColor.GREEN + s.getSeller() + ChatColor.YELLOW + " - " + ChatColor.GREEN + s.getPrice() + ChatColor.YELLOW + " - " + ChatColor.GREEN + s.isInstant());
 
 				}
 
@@ -608,6 +607,41 @@ public class RegionMarketManager {
 
 				offers = null;
 
+			} else if(etc[0].equals("i")){
+				
+				ArrayList<RegionSale> sales = new ArrayList<RegionSale>();
+				
+				for(String key : regionList.keySet())
+					for(RegionSale s : regionList.get(key))
+						if(s.isInstant())
+							sales.add(s);
+				
+				if(sales.size() == 0){
+
+					RegionMarket.outputDebug(p, "There are no instant sales available.");
+					return;
+
+				}
+				if(page + 1 > (int)Math.ceil(sales.size() / 7.0)){
+
+					RegionMarket.outputError(p, (page + 1) + " is greater than the max, " + (int)Math.ceil(sales.size() / 7.0));
+					return;
+
+				}
+
+				p.sendMessage(ChatColor.GREEN + "Showing all instant sales; Page " + ChatColor.WHITE + (page + 1) + ChatColor.GREEN + " of " + ChatColor.WHITE + (int)Math.ceil(sales.size() / 7.0));
+				p.sendMessage(ChatColor.GREEN + "<" + ChatColor.WHITE + "region" + ChatColor.GREEN + ">" + ChatColor.YELLOW + " - " + ChatColor.GREEN + "<" + ChatColor.WHITE + "seller" + ChatColor.GREEN + ">" + ChatColor.YELLOW + " - " + ChatColor.GREEN + "<" + ChatColor.WHITE + "price" + ChatColor.GREEN + ">");
+
+				for(int j = 0, i = page * 7; j < 7 && i < sales.size(); j++, i++){
+
+					RegionSale s = sales.get(i);
+					p.sendMessage(ChatColor.GREEN + s.getRegion() + ChatColor.YELLOW + " - " + ChatColor.GREEN + s.getSeller() + ChatColor.YELLOW + " - " + ChatColor.GREEN + s.getPrice());
+
+				}
+
+				sales = null;
+
+				
 			}
 
 		}

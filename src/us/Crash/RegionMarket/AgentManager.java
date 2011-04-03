@@ -9,13 +9,15 @@ import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Server;
 import org.bukkit.World;
+import org.bukkit.block.BlockFace;
+import org.bukkit.block.Sign;
 import org.bukkit.craftbukkit.CraftServer;
 import org.bukkit.craftbukkit.CraftWorld;
 import org.bukkit.entity.Player;
 
 import com.nijiko.coelho.iConomy.iConomy;
 import com.nijiko.coelho.iConomy.system.Account;
-import com.sk89q.worldguard.protection.ProtectedRegion;
+import com.sk89q.worldguard.protection.regions.*;
 
 import net.minecraft.server.*;
 
@@ -39,7 +41,7 @@ public class AgentManager {
 		RegionAgent r = new RegionAgent(adder + "'s Agent - " + region, adder, region, loc, price, 0);
 
 		r.makeAgentBase(s, w, new ItemInWorldManager(w), this);
-
+		
 		r.getAgent().c(loc.getX(), loc.getY(), loc.getZ(), loc.getYaw(), loc.getPitch());
 
 		w.c((int)MathHelper.b(r.getAgent().locX / 16.0D), (int)MathHelper.b(r.getAgent().locZ / 16.0D)).a(r.getAgent());
@@ -60,7 +62,15 @@ public class AgentManager {
 	
 	public void addSignToWorld(Location loc, String adder, String region, int price){
 
+		if(loc.getBlock().getTypeId() != 68 || loc.getBlock().getTypeId() != 63){
+			
+			RegionMarket.outputConsole("Error : " + adder + "'s agent for " + region + " is not a sign!");
+			return;
+			
+		}
+		
 		agentList.add(new RegionAgent("", adder, region, loc, price, 1));
+
 		
 	}
 
@@ -223,7 +233,7 @@ public class AgentManager {
 		Player p = (Player)e;
 
 		Account buyAcc = iConomy.getBank().getAccount(p.getName()), sellAcc = iConomy.getBank().getAccount(agent.getSeller());
-		ProtectedRegion region = marketManager.getRegion(agent.getRegion());
+		ProtectedRegion region = marketManager.getRegion(e.getWorld(), agent.getRegion());
 		
 		if(agent.getSeller().equalsIgnoreCase(p.getName())){
 			
@@ -244,8 +254,6 @@ public class AgentManager {
 
 		buyAcc.subtract(agent.getPrice());
 		sellAcc.add(agent.getPrice());
-		buyAcc.save();
-		sellAcc.save();
 		region.getOwners().addPlayer(p.getName());
 		region.getOwners().removePlayer(agent.getSeller());
 
