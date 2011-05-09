@@ -40,14 +40,14 @@ public class RegionAgent {
 	public AgentBase getAgent(){ return self; }
 	public int getPrice(){ return sellPrice; }
 	public int getType(){ return myType; }
-	public void moveTo(Location loc){ 
+	public void moveTo(Location loc){
 		
 		if(myType != 0)
 			return;
 		
 		myLoc = loc;
-		if(self != null)
-			self.c(myLoc.getX(), myLoc.getY(), myLoc.getZ(), myLoc.getYaw(), myLoc.getPitch());
+		//if(self != null)
+			//self.c(myLoc.getX(), myLoc.getY(), myLoc.getZ(), myLoc.getYaw(), myLoc.getPitch());
 		
 	}
 	

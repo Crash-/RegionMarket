@@ -3,8 +3,6 @@ package us.Crash.RegionMarket;
 import java.io.*;
 import java.net.Socket;
 
-import org.bukkit.craftbukkit.entity.CraftPlayer;
-
 import net.minecraft.server.*;
 
 public class AgentBase extends EntityPlayer {
@@ -17,9 +15,9 @@ public class AgentBase extends EntityPlayer {
 		super(minecraftserver, world, s, iteminworldmanager);
 		AgentMgr = mgr;
 		agent = a;
-		
-		NetworkManager m = new NetworkManager(new AgentSocket(), "AgentMgr", null);
-		this.a = new AgentNetHandler(minecraftserver, m, this);
+		//AgentNetHandler d;
+		//NetworkManager m = new NetworkManager(new AgentSocket(), "AgentMgr", null);
+		//this.a = new AgentNetHandler(minecraftserver, m, this);
 	}
 	
 	@Override
@@ -59,7 +57,7 @@ class AgentNetHandler extends NetServerHandler {
 
     }
 
-    @Override
+    /*@Override
     public CraftPlayer getPlayer() {
         return null;
     }
@@ -156,6 +154,6 @@ class AgentNetHandler extends NetServerHandler {
 
     @Override
     public void a(Packet130UpdateSign packet130updatesign) {
-    }
+    }*/
     
 }

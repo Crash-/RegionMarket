@@ -12,10 +12,11 @@ import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.bukkit.util.config.Configuration;
 
 public class FileManager {
 
-	private final String fileName, pathDir;
+	private final String fileName, pathDir, configPath;
 	private final RegionMarket plugin;
 	BufferedWriter out = null;
 
@@ -25,6 +26,8 @@ public class FileManager {
 		pathDir = dataPath;
 		plugin = main;
 
+		configPath = "plugins/RegionMarket/config.yml";
+		
 		loadData();
 
 	}
@@ -35,8 +38,15 @@ public class FileManager {
 
 	public void saveData(){
 
-		openSaveFile();
+		Configuration config = new Configuration(new File(configPath));
+		config.load();
+		
+		config.setProperty("use-max-regions", RegionMarket.useMaxRegions);
 
+		config.save();
+		
+		openSaveFile();
+		
 		writeLine("nr=" + plugin.getMarketManager().getRegionsForSale().size());
 
 		for(String region : plugin.getMarketManager().getRegionsForSale().keySet()){
@@ -94,15 +104,22 @@ public class FileManager {
 				RegionMarket.outputConsole("Error when generating save file.");
 				return false;
 			}
+			try {
+				new File(configPath).createNewFile();
+			} catch (IOException e) { 
+				RegionMarket.outputConsole("Error when generating config file.");
+				return false;
+			}
 			if(reloader.length == 1)
 				reloader[0].sendMessage(ChatColor.AQUA + "[RegionMarket] " + ChatColor.YELLOW + "Created RM directory and save file.");
-			RegionMarket.outputConsole("Created RM directory and generated save data file.");
+			RegionMarket.outputConsole("Created RM directory and generated save data file and config file.");
 
 		} else {
 
 			try {
-				if(new File(pathDir + fileName).createNewFile()){
+				if(!new File(pathDir + fileName).exists()){
 
+					new File(pathDir + fileName).createNewFile();
 					RegionMarket.outputConsole("Created save data file.");
 					openSaveFile();
 					writeLine("nr=0");
@@ -113,7 +130,22 @@ public class FileManager {
 				RegionMarket.outputConsole("Error when generating save file.");
 				return false;
 			}
+			
+			try {
+				if(!new File(configPath).exists()){
 
+					new File(configPath).createNewFile();
+					RegionMarket.outputConsole("Created config file.");
+					Configuration config = new Configuration(new File(configPath));
+					config.setProperty("use-max-regions", false);
+					config.save();
+
+				}
+			} catch (IOException e) {
+				RegionMarket.outputConsole("Error when generating config file.");
+				return false;
+			}
+			
 		}
 
 		try {
@@ -126,6 +158,11 @@ public class FileManager {
 			return false;
 
 		}
+		
+		Configuration config = new Configuration(new File(configPath));
+		config.load();
+		
+		RegionMarket.useMaxRegions = config.getBoolean("use-max-regions", false);
 
 		boolean regionReadError = false;
 
@@ -223,7 +260,7 @@ public class FileManager {
 							float yaw = Float.parseFloat(args[4]), pitch = Float.parseFloat(args[5]);
 							World world = RegionMarket.server.getWorlds().get(w);
 							Location loc = new Location(world, x, y, z, yaw, pitch);
-							plugin.getMarketManager().getAgentManager().addAgentToWorld(world, loc, sellers[j], region, price);
+							plugin.getMarketManager().getAgentManager().makeNewAgent(loc, sellers[j], region, price);
 							line = in.readLine();
 							
 						} else if(agentType == 1){

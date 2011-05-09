@@ -1,29 +1,30 @@
 package us.Crash.RegionMarket;
 
+import java.io.IOException;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Server;
 import org.bukkit.World;
-import org.bukkit.block.BlockFace;
 import org.bukkit.block.Sign;
 import org.bukkit.craftbukkit.CraftServer;
 import org.bukkit.craftbukkit.CraftWorld;
 import org.bukkit.entity.Player;
 
-import com.nijiko.coelho.iConomy.iConomy;
-import com.nijiko.coelho.iConomy.system.Account;
 import com.sk89q.worldguard.protection.regions.*;
 
 import net.minecraft.server.*;
 
+
 public class AgentManager {
 
 	private ArrayList<RegionAgent> agentList = new ArrayList<RegionAgent>();
+	private HashMap<String, RegionAgent> confirmList = new HashMap<String, RegionAgent>(); 
+	private HashMap<String, Long> cooldownList = new HashMap<String, Long>();
 	private RegionMarketManager marketManager;
 
 	public AgentManager(RegionMarketManager mgr){
@@ -31,18 +32,27 @@ public class AgentManager {
 		marketManager = mgr;
 
 	}
-
-	@SuppressWarnings("unchecked")
-	public void addAgentToWorld(World world, Location loc, String adder, String region, int price) {
-
-		WorldServer w = getWorldServer(world);
-		MinecraftServer s = getMinecraftServer(RegionMarket.server);
-
+	
+	public ArrayList<RegionAgent> getAgentList(){ return agentList; }
+	
+	public RegionAgent makeNewAgent(Location loc, String adder, String region, int price){
+		
 		RegionAgent r = new RegionAgent(adder + "'s Agent - " + region, adder, region, loc, price, 0);
+		
+		agentList.add(r);
+		
+		return r;
+		
+	}
+	
+	/*public void addAgentToWorld(RegionAgent r) {
+
+		WorldServer w = getWorldServer(r.getLocation().getWorld());
+		MinecraftServer s = getMinecraftServer(RegionMarket.server);
 
 		r.makeAgentBase(s, w, new ItemInWorldManager(w), this);
 		
-		r.getAgent().c(loc.getX(), loc.getY(), loc.getZ(), loc.getYaw(), loc.getPitch());
+		r.getAgent().c(r.getLocation().getX(), r.getLocation().getY(), r.getLocation().getZ(), r.getLocation().getYaw(), r.getLocation().getPitch());
 
 		w.c((int)MathHelper.b(r.getAgent().locX / 16.0D), (int)MathHelper.b(r.getAgent().locZ / 16.0D)).a(r.getAgent());
 		w.b.add(r.getAgent());
@@ -54,46 +64,57 @@ public class AgentManager {
 			method.setAccessible(true);
 			method.invoke(w, r.getAgent());
 
-		} catch(Exception e){ }
+		} catch(Exception e){ return; }
 
-		agentList.add(r);
-
-	}
+	}*/
 	
 	public void addSignToWorld(Location loc, String adder, String region, int price){
 
-		if(loc.getBlock().getTypeId() != 68 || loc.getBlock().getTypeId() != 63){
+		if(loc.getBlock().getTypeId() != 68 && loc.getBlock().getTypeId() != 63){
 			
 			RegionMarket.outputConsole("Error : " + adder + "'s agent for " + region + " is not a sign!");
 			return;
 			
 		}
 		
-		agentList.add(new RegionAgent("", adder, region, loc, price, 1));
-
+		Sign s = (Sign)loc.getBlock().getState();
+		
+		s.setLine(0, "[AGENT]");
+		s.setLine(1, region);
+		s.setLine(2, "" + price);
+		
+		RegionAgent agent = new RegionAgent("", adder, region, loc, price, 1); 
+		
+		agentList.add(agent);
 		
 	}
 
-	public void removeAllAgents(){
+	public void deleteAllAgents(){
 		
 		for(Iterator<RegionAgent>i = agentList.iterator(); i.hasNext();){
 			
-			RegionAgent a = i.next();
-			if(a.getType() == 0)
-				a.getAgent().world.e(a.getAgent());
+			//RegionAgent a = i.next();
+			//if(a.getType() == 0)
+				//a.getAgent().world.e(a.getAgent());
 			i.remove();
 			
 		}
 		
 	}
 	
-	public boolean removeAgentFromWorld(String seller, String region, boolean... changeSign){
+	public boolean deleteAgentFromWorld(String seller, String region, boolean... changeSign){
 
 		RegionAgent agent = getAgent(seller, region);
+		
+		if(agent.getType() == 0)
+			return false;
+		
 		if(changeSign.length == 1 && changeSign[0] && agent.getType() == 1)
 			agent.getLocation().getBlock().setTypeId(0);
+		
+		agentList.remove(agent);
 
-		if(agentList.remove(agent)){
+		/*if(agentList.remove(agent)){
 
 			try {
 
@@ -104,15 +125,15 @@ public class AgentManager {
 
 			return true;
 
-		}
+		}*/
 
 		return false;
 
 	}
 
-	public void removeAgentFromWorld(RegionAgent agent){
+	public void deleteAgentFromWorld(RegionAgent agent){
 
-		if(agentList.remove(agent)){
+		/*if(agentList.remove(agent)){
 
 			try {
 
@@ -121,7 +142,9 @@ public class AgentManager {
 				
 			} catch(Exception e){ }
 
-		}
+		}*/
+		
+		agentList.remove(agent);
 
 	}
 
@@ -171,6 +194,7 @@ public class AgentManager {
 		
 	}
 
+	@SuppressWarnings("unused")
 	private WorldServer getWorldServer(World world) {
 
 		try {
@@ -187,6 +211,7 @@ public class AgentManager {
 
 	}
 
+	@SuppressWarnings("unused")
 	private MinecraftServer getMinecraftServer(Server server) {
 
 		if (server instanceof CraftServer) {
@@ -220,7 +245,15 @@ public class AgentManager {
 
 			} else {
 
-				p.sendMessage(ChatColor.YELLOW + "[NPC]Hello, I am selling " + agent.getSeller() + "'s region, " + agent.getRegion() + " for " + agent.getPrice() + ". Attack me to buy the region!");
+				if(!confirmList.containsKey(p.getName()))
+					p.sendMessage(ChatColor.YELLOW + "[NPC]Hello, I am selling " + agent.getSeller() + "'s region, " + agent.getRegion() + " for " + agent.getPrice() + ". Attack me to buy the region!");
+				else {
+					
+					p.sendMessage(ChatColor.YELLOW + "[NPC]You canceled the offer.");
+					confirmList.remove(p.getName());
+					return;
+					
+				}
 
 			}
 
@@ -232,7 +265,7 @@ public class AgentManager {
 
 		Player p = (Player)e;
 
-		Account buyAcc = iConomy.getBank().getAccount(p.getName()), sellAcc = iConomy.getBank().getAccount(agent.getSeller());
+		RegionAccount buyAcc = new RegionAccount(p.getName()), sellAcc = new RegionAccount(agent.getSeller());
 		ProtectedRegion region = marketManager.getRegion(e.getWorld(), agent.getRegion());
 		
 		if(agent.getSeller().equalsIgnoreCase(p.getName())){
@@ -251,13 +284,49 @@ public class AgentManager {
 			return;
 
 		}
-
-		buyAcc.subtract(agent.getPrice());
-		sellAcc.add(agent.getPrice());
+		
+		if(marketManager.hasReachedMaxRegionsAllowed(p)){
+			
+			p.sendMessage(ChatColor.YELLOW + "[NPC]Sorry, you've reached the max amount of regions that you can own.");
+			return;
+			
+		}
+		
+		
+		if(!confirmList.containsKey(p.getName()) || !confirmList.get(p.getName()).getRegion().equals(agent.getRegion())){
+			
+			confirmList.put(p.getName(), agent);
+			cooldownList.put(p.getName(), System.currentTimeMillis());
+			p.sendMessage(ChatColor.YELLOW + "[NPC]Left click me again to confirm the offer and right click to cancel.");
+			return;
+			
+		}
+		
+		Long coolTime = cooldownList.get(p.getName());
+		
+		if(coolTime != null){
+			
+			if(System.currentTimeMillis() - coolTime < 1000)
+				return;
+			
+			cooldownList.remove(p.getName());
+			
+		}
+		
+		confirmList.remove(p.getName());
+		
+		buyAcc.subtractMoney(agent.getPrice());
+		sellAcc.addMoney(agent.getPrice());
 		region.getOwners().addPlayer(p.getName());
 		region.getOwners().removePlayer(agent.getSeller());
 
 		marketManager.removeRegionSale(region, agent.getSeller());
+		
+		try {
+			RegionMarket.WorldGuard.getGlobalRegionManager().get(p.getWorld()).save();
+		} catch (IOException e1) {
+			e1.printStackTrace();
+		}
 		
 		Player player = RegionMarket.getPlayer(agent.getSeller());
 		if(player != null)

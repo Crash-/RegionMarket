@@ -1,4 +1,5 @@
 package us.Crash.RegionMarket;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -6,8 +7,6 @@ import java.util.Iterator;
 import org.bukkit.ChatColor;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
-import com.nijiko.coelho.iConomy.iConomy;
-import com.nijiko.coelho.iConomy.system.Account;
 import com.sk89q.worldguard.bukkit.BukkitPlayer;
 import com.sk89q.worldguard.protection.regions.*;
 
@@ -31,6 +30,15 @@ public class RegionMarketManager {
 	
 	public AgentManager getAgentManager(){ return AgentMgr; }
 
+	public boolean hasReachedMaxRegionsAllowed(Player p){
+		
+		if(RegionMarket.useMaxRegions)
+			return RegionMarket.WorldGuard.getGlobalRegionManager().get(p.getWorld()).getRegionCountOfPlayer(new BukkitPlayer(RegionMarket.WorldGuard, p)) >= RegionMarket.WorldGuard.getGlobalConfiguration().get(p.getWorld()).maxRegionCountPerPlayer;
+		else
+			return false;
+		
+	}
+	
 	public RegionOffer findOffer(ProtectedRegion region, String seller, String buyer){
 
 		if(region == null)
@@ -158,7 +166,7 @@ public class RegionMarketManager {
 	}
 
 	public boolean hasOfferedOnRegion(String name, String seller, Player player){
-
+		
 		if(offerList.get(name) == null)
 			return false;
 
@@ -175,6 +183,9 @@ public class RegionMarketManager {
 
 	public boolean hasOfferedOnRegion(ProtectedRegion region, String seller, Player player){
 
+		if(region == null)
+			return false;
+		
 		if(offerList.get(region.getId()) == null)
 			return false;
 
@@ -191,6 +202,9 @@ public class RegionMarketManager {
 
 	public boolean hasOfferedOnRegion(ProtectedRegion region, String seller, String player){
 
+		if(region == null)
+			return false;
+		
 		if(offerList.get(region.getId()) == null)
 			return false;
 
@@ -208,6 +222,9 @@ public class RegionMarketManager {
 
 	public void addOffer(ProtectedRegion region, String seller, Player player, int price){
 
+		if(region == null)
+			return;
+		
 		if(!offerList.containsKey(region.getId()))
 			offerList.put(region.getId(), new ArrayList<RegionOffer>());
 
@@ -230,6 +247,9 @@ public class RegionMarketManager {
 
 	public void removeOffer(ProtectedRegion region, String seller, Player player){
 
+		if(region == null)
+			return;
+		
 		if(offerList.get(region.getId()) == null)
 			return;
 
@@ -249,7 +269,10 @@ public class RegionMarketManager {
 	}
 
 	public void addRegionSale(ProtectedRegion region, Player seller, int price, boolean instant){
-
+		
+		if(region == null)
+			return;
+		
 		if(!isOnMarket(region))
 			regionList.put(region.getId(), new ArrayList<RegionSale>());
 
@@ -279,7 +302,7 @@ public class RegionMarketManager {
 		
 		RegionAgent a = AgentMgr.getAgent(seller.getName(), region.getId());
 		if(a != null)
-			AgentMgr.removeAgentFromWorld(a);
+			AgentMgr.deleteAgentFromWorld(a);
 
 	}
 
@@ -305,7 +328,7 @@ public class RegionMarketManager {
 		
 		RegionAgent a = AgentMgr.getAgent(seller, region.getId());
 		if(a != null)
-			AgentMgr.removeAgentFromWorld(a);
+			AgentMgr.deleteAgentFromWorld(a);
 
 	}
 
@@ -328,15 +351,22 @@ public class RegionMarketManager {
 
 		}
 
-		Account sellAcc = iConomy.getBank().getAccount(seller), buyAcc = iConomy.getBank().getAccount(buyer);
+		RegionAccount sellAcc = new RegionAccount(seller), buyAcc = new RegionAccount(buyer);
 
 		if(buyAcc.hasEnough(o.getPrice())){
 
 			region.getOwners().removePlayer(seller);
 			region.getOwners().addPlayer(buyer);
-			sellAcc.setBalance(sellAcc.getBalance() + o.getPrice());
-			buyAcc.setBalance(buyAcc.getBalance() - o.getPrice());
+			sellAcc.addMoney(o.getPrice());
+			buyAcc.subtractMoney(o.getPrice());
 			Player p = RegionMarket.getPlayer(buyer);
+			
+			try {
+				RegionMarket.WorldGuard.getGlobalRegionManager().get(p.getWorld()).save();
+			} catch (IOException e1) {
+				e1.printStackTrace();
+			}
+			
 			if(p != null)
 				p.sendMessage(ChatColor.AQUA + "[RegionMarket] " + ChatColor.YELLOW + seller + " has sold you their region " + region.getId() + "!");
 
@@ -370,6 +400,9 @@ public class RegionMarketManager {
 
 	public int getPrice(ProtectedRegion region, String playername){
 
+		if(region == null)
+			return -1;
+		
 		RegionSale sale = findSale(region.getId(), playername);
 		if(sale == null)
 			return -1;
